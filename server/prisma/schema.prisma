@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  id            String            @id @default(uuid())
+  name          String
+  email         String            @unique
+  password      String
+  phone         String?
+  role          String            @default("employee") // "employee" | "team_lead" | "manager" | "director"
+  teamId        String?
+  team          Team?             @relation("teamMembers", fields: [teamId], references: [id])
+  seniority     Int               @default(0)
+  swapPoints    Int               @default(3)
+  constraints   Constraint[]
+  tags          EmployeeTag[]
+  lifeEvents    LifeEvent[]
+  ratings       Rating[]
+  assignments   ShiftAssignment[]
+  swapRequests  SwapRequest[]     @relation("requester")
+  swapCovers    SwapRequest[]     @relation("coverer")
+  ledTeams      Team[]            @relation("teamLead")
+  managedTeams  Team[]            @relation("manager")
+  createdAt     DateTime          @default(now())
+}
+
+model Team {
+  id              String            @id @default(uuid())
+  name            String
+  leadId          String
+  lead            Employee          @relation("teamLead", fields: [leadId], references: [id])
+  managerId       String
+  manager         Employee          @relation("manager", fields: [managerId], references: [id])
+  employees       Employee[]        @relation("teamMembers")
+  shiftTemplates  ShiftTemplate[]
+  createdAt       DateTime          @default(now())
+}
+
+model Constraint {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  weekStart    DateTime
+  date         DateTime
+  type         String   // "hard" | "soft"
+  availability String   // "unavailable" | "morning_only" | "evening_only" | "night_only" | "available" | "available_extra"
+  reason       String?
+  originalText String?
+  confirmed    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model EmployeeTag {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  tag        String
+  category   String   // "functional" | "social" | "availability" | "custom"
+  assignedBy String
+  assignedAt DateTime @default(now())
+
+  @@unique([employeeId, tag])
+}
+
+model LifeEvent {
+  id                 String    @id @default(uuid())
+  employeeId         String
+  employee           Employee  @relation(fields: [employeeId], references: [id])
+  type               String    // "military" | "studies" | "pregnancy" | "family" | "health" | "other"
+  title              String
+  startDate          DateTime
+  endDate            DateTime?
+  notes              String?
+  availabilityImpact String    // "unavailable" | "partial" | "consider"
+  createdBy          String
+  createdAt          DateTime  @default(now())
+}
+
+model ShiftTemplate {
+  id            String   @id @default(uuid())
+  name          String
+  startTime     String
+  endTime       String
+  requiredCount Int
+  dayOfWeek     Int      // 0-6
+  requiredTags  String[]
+  teamId        String
+  team          Team     @relation(fields: [teamId], references: [id])
+  createdAt     DateTime @default(now())
+}
+
+model ShiftAssignment {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  date       DateTime
+  shiftName  String
+  status     String   @default("draft") // "draft" | "published" | "swap_requested" | "swapped"
+  weekStart  DateTime
+  teamId     String
+  createdAt  DateTime @default(now())
+}
+
+model SwapRequest {
+  id            String    @id @default(uuid())
+  requesterId   String
+  requester     Employee  @relation("requester", fields: [requesterId], references: [id])
+  assignmentId  String
+  covererId     String?
+  coverer       Employee? @relation("coverer", fields: [covererId], references: [id])
+  status        String    @default("open") // "open" | "covered" | "approved" | "rejected" | "cancelled"
+  pointsAwarded Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  resolvedAt    DateTime?
+}
+
+model Rating {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  category   String   // "reliability" | "teamwork" | "flexibility" | "performance"
+  score      Int      // 1-5
+  notes      String?
+  ratedBy    String
+  ratedAt    DateTime @default(now())
+
+  @@unique([employeeId, category, ratedBy])
+}
