@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
-import { Search, User, Tag, Clock, Brain, Plus, X, AlertTriangle, Lightbulb, ThumbsUp, GripVertical } from 'lucide-react';
+import { Search, User, Tag, Clock, Brain, Plus, X, AlertTriangle, Lightbulb, ThumbsUp } from 'lucide-react';
 
 interface Employee {
   id: string;
@@ -73,7 +72,6 @@ const IMPACT_LABELS: Record<string, string> = {
 };
 
 export default function TeamLeadEmployees() {
-  const { user } = useAuth();
   const [teams, setTeams] = useState<any[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);

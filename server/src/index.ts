@@ -33,9 +33,19 @@ app.use('/api/employees', ratingRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/director', directorRoutes);
 
+// Serve static client in production
+import path from 'path';
+const clientDist = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientDist));
+
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
+});
+
+// SPA fallback — serve index.html for all non-API routes
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(clientDist, 'index.html'));
 });
 
 app.listen(PORT, () => {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { Brain, AlertTriangle, TrendingUp, Users, ChevronDown, ChevronUp } from 'lucide-react';
@@ -214,7 +214,7 @@ export default function DirectorDashboard() {
                   cx="50%"
                   cy="50%"
                   outerRadius={80}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={(props: any) => `${props.name} ${((props.percent ?? 0) * 100).toFixed(0)}%`}
                   dataKey="value"
                 >
                   {constraintPieData.map((_, index) => (

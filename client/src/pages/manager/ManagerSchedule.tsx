@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
-import { Calendar, ArrowRight, ArrowLeft, Zap, Send, AlertTriangle, GripVertical } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Zap, Send, AlertTriangle, GripVertical } from 'lucide-react';
 
 interface Assignment {
   id: string;
@@ -23,7 +23,7 @@ function getWeekStart(offset: number): string {
 }
 
 export default function ManagerSchedule() {
-  const { user } = useAuth();
+  useAuth();
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeam, setSelectedTeam] = useState('');
   const [weekOffset, setWeekOffset] = useState(1);
@@ -34,7 +34,7 @@ export default function ManagerSchedule() {
   const [dragItem, setDragItem] = useState<Assignment | null>(null);
 
   const weekStart = getWeekStart(weekOffset);
-  const days = [];
+  const days: { date: string; name: string; display: string }[] = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
@@ -122,7 +122,7 @@ export default function ManagerSchedule() {
   };
 
   const isDraft = schedule.some(a => a.status === 'draft');
-  const isPublished = schedule.some(a => a.status === 'published');
+
 
   return (
     <div>

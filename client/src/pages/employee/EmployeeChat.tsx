@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
-import { Send, Check, Trash2, ChevronDown, Star } from 'lucide-react';
+import { Send, Check, Trash2, Star } from 'lucide-react';
 
 interface Constraint {
   date: string;

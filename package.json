@@ -1,0 +1,13 @@
+{
+  "name": "shift-management",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd client && npm install && npm run build && cd ../server && npm install && npx prisma generate",
+    "start": "cd server && node --import tsx src/index.ts",
+    "db:push": "cd server && npx prisma db push",
+    "db:seed": "cd server && npx tsx prisma/seed.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
