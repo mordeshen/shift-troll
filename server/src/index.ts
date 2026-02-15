@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 import { PrismaClient } from '@prisma/client';
 import authRoutes from './routes/auth';
 import constraintRoutes from './routes/constraints';
@@ -33,20 +35,29 @@ app.use('/api/employees', ratingRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/director', directorRoutes);
 
-// Serve static client in production
-import path from 'path';
-const clientDist = path.join(__dirname, '../../client/dist');
-app.use(express.static(clientDist));
-
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// SPA fallback — serve index.html for all non-API routes
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(clientDist, 'index.html'));
-});
+// Serve static client in production
+const clientDist = path.join(__dirname, '../../client/dist');
+const indexHtml = path.join(clientDist, 'index.html');
+
+if (fs.existsSync(indexHtml)) {
+  console.log('Serving static client from:', clientDist);
+  app.use(express.static(clientDist));
+
+  // SPA fallback — serve index.html for all non-API routes
+  app.get('*', (_req, res) => {
+    res.sendFile(indexHtml);
+  });
+} else {
+  console.log('No client build found at:', clientDist);
+  app.get('/', (_req, res) => {
+    res.json({ message: 'API is running. Client not built yet.', health: '/api/health' });
+  });
+}
 
 app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
