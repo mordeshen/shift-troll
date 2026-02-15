@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "build": "cd client && npm install && npm run build && cd ../server && npm install && npx prisma generate && npx prisma db push && npx tsx prisma/seed.ts",
-    "start": "cd server && node --import tsx src/index.ts",
+    "start": "cd server && npx tsx src/index.ts",
     "db:push": "cd server && npx prisma db push",
     "db:seed": "cd server && npx tsx prisma/seed.ts"
   },
