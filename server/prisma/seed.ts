@@ -4,6 +4,13 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
+  // Skip if already seeded
+  const existing = await prisma.employee.count();
+  if (existing > 0) {
+    console.log('Database already seeded, skipping.');
+    return;
+  }
+
   console.log('Seeding database...');
 
   const password = await bcrypt.hash('123456', 10);
