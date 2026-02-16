@@ -31,8 +31,13 @@ app.use(express.json());
 app.locals.prisma = prisma;
 
 // Health check — FIRST, before anything else
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', port: PORT });
+app.get('/api/health', async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ok', port: PORT, db: 'connected' });
+  } catch (err: any) {
+    res.json({ status: 'ok', port: PORT, db: 'error', dbError: err.message });
+  }
 });
 
 // Routes (lazy load to catch import errors)
