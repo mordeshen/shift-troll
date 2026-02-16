@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Star, Save } from 'lucide-react';
+import { Star, Save, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 interface Employee {
   id: string;
@@ -30,6 +30,13 @@ export default function ManagerRatings() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRatings, setEditRatings] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     api.get('/team').then(res => {
@@ -76,7 +83,7 @@ export default function ManagerRatings() {
       const res = await api.get(`/team/${selectedTeam}/employees`);
       setEmployees(res.data);
     } catch {
-      alert('שגיאה בשמירה');
+      setToast({ message: 'שגיאה בשמירה', type: 'error' });
     }
   };
 
@@ -98,7 +105,10 @@ export default function ManagerRatings() {
       </div>
 
       {loading ? (
-        <div className="text-center py-10 text-gray-400">טוען...</div>
+        <div className="text-center py-10 text-gray-400">
+          <Loader2 className="w-8 h-8 mx-auto mb-3 animate-spin opacity-50" />
+          <p>טוען דירוגים...</p>
+        </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full">
@@ -186,6 +196,15 @@ export default function ManagerRatings() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm text-white z-50 ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        }`}>
+          {toast.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {toast.message}
         </div>
       )}
     </div>

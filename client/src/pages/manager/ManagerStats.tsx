@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
 
 interface Distribution {
   name: string;
@@ -79,19 +79,22 @@ export default function ManagerStats() {
             </select>
           )}
           <div className="flex items-center gap-2">
-            <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 hover:bg-gray-100 rounded-lg">
-              <ArrowRight className="w-5 h-5" />
+            <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="שבוע הבא">
+              <ChevronRight className="w-5 h-5" />
             </button>
             <span className="text-sm font-medium">{days[0].display} — {days[6].display}</span>
-            <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 hover:bg-gray-100 rounded-lg">
-              <ArrowLeft className="w-5 h-5" />
+            <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="שבוע קודם">
+              <ChevronLeft className="w-5 h-5" />
             </button>
           </div>
         </div>
       </div>
 
       {loading ? (
-        <div className="text-center py-10 text-gray-400">טוען...</div>
+        <div className="text-center py-10 text-gray-400">
+          <Loader2 className="w-8 h-8 mx-auto mb-3 animate-spin opacity-50" />
+          <p>טוען סטטיסטיקות...</p>
+        </div>
       ) : !stats ? (
         <div className="text-center py-10 text-gray-400">אין נתונים</div>
       ) : (

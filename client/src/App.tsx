@@ -18,7 +18,7 @@ import ManagerEmployees from './pages/manager/ManagerEmployees';
 function RoleRedirect() {
   const { user, loading } = useAuth();
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">טוען...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400"><div className="animate-spin-slow w-8 h-8 border-2 border-gray-300 border-t-blue-500 rounded-full" /></div>;
   if (!user) return <Navigate to="/login" />;
 
   switch (user.role) {
@@ -33,7 +33,7 @@ function RoleRedirect() {
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles: string[] }) {
   const { user, loading } = useAuth();
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">טוען...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400"><div className="animate-spin-slow w-8 h-8 border-2 border-gray-300 border-t-blue-500 rounded-full" /></div>;
   if (!user) return <Navigate to="/login" />;
   if (!user.effectiveRoles?.some(r => roles.includes(r))) return <Navigate to="/" />;
 

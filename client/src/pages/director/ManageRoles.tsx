@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Search, Check, AlertCircle } from 'lucide-react';
+import { Search, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 interface Employee {
   id: string;
@@ -77,7 +77,10 @@ export default function ManageRoles() {
       </div>
 
       {loading ? (
-        <div className="text-center py-10 text-gray-400">טוען...</div>
+        <div className="text-center py-10 text-gray-400">
+          <Loader2 className="w-8 h-8 mx-auto mb-3 animate-spin opacity-50" />
+          <p>טוען משתמשים...</p>
+        </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full">

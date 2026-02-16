@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
-import { Send, Check, Trash2, Star } from 'lucide-react';
+import { Send, Check, Trash2, Star, AlertCircle } from 'lucide-react';
 
 interface Constraint {
   date: string;
@@ -68,6 +68,7 @@ export default function EmployeeChat() {
   const [loading, setLoading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const weekStart = getNextSunday();
@@ -76,6 +77,12 @@ export default function EmployeeChat() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [displayMessages]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
@@ -121,7 +128,7 @@ export default function EmployeeChat() {
       });
       setSubmitted(true);
     } catch (err) {
-      alert('שגיאה בשליחה. נסה שוב.');
+      setToast({ message: 'שגיאה בשליחה. נסה שוב.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -177,7 +184,7 @@ export default function EmployeeChat() {
           <h3 className="font-medium text-gray-700">ספר לי על הזמינות שלך השבוע</h3>
         </div>
 
-        <div className="h-80 overflow-y-auto p-4 space-y-3">
+        <div className="h-64 md:h-80 overflow-y-auto p-4 space-y-3">
           {displayMessages.length === 0 && (
             <div className="text-center text-gray-400 py-10">
               <p className="text-lg mb-2">כתוב בשפה חופשית את הזמינות שלך</p>
@@ -185,19 +192,19 @@ export default function EmployeeChat() {
             </div>
           )}
           {displayMessages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
                 msg.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-md'
-                  : 'bg-gray-100 text-gray-800 rounded-bl-md'
+                  ? 'bg-blue-600 text-white rounded-bl-md'
+                  : 'bg-gray-100 text-gray-800 rounded-br-md'
               }`}>
                 {msg.text}
               </div>
             </div>
           ))}
           {loading && (
-            <div className="flex justify-end">
-              <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
+            <div className="flex justify-start">
+              <div className="bg-gray-100 rounded-2xl rounded-br-md px-4 py-3">
                 <div className="flex gap-1">
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -315,6 +322,16 @@ export default function EmployeeChat() {
           >
             שלח לסידור
           </button>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm text-white z-50 ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        }`}>
+          {toast.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {toast.message}
         </div>
       )}
     </div>

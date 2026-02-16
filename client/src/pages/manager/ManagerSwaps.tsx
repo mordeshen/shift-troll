@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { RefreshCw, Check, X, Clock } from 'lucide-react';
+import { RefreshCw, Check, X, Clock, AlertCircle, Loader2 } from 'lucide-react';
 
 interface SwapRequest {
   id: string;
@@ -26,10 +26,17 @@ export default function ManagerSwaps() {
   const [swaps, setSwaps] = useState<SwapRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     loadSwaps();
   }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const loadSwaps = async () => {
     setLoading(true);
@@ -48,7 +55,7 @@ export default function ManagerSwaps() {
       await api.post(`/swaps/${id}/approve`);
       loadSwaps();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'שגיאה באישור');
+      setToast({ message: err.response?.data?.error || 'שגיאה באישור', type: 'error' });
     }
   };
 
@@ -57,7 +64,7 @@ export default function ManagerSwaps() {
       await api.post(`/swaps/${id}/reject`);
       loadSwaps();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'שגיאה בדחייה');
+      setToast({ message: err.response?.data?.error || 'שגיאה בדחייה', type: 'error' });
     }
   };
 
@@ -83,7 +90,10 @@ export default function ManagerSwaps() {
       </div>
 
       {loading ? (
-        <div className="text-center py-10 text-gray-400">טוען...</div>
+        <div className="text-center py-10 text-gray-400">
+          <Loader2 className="w-8 h-8 mx-auto mb-3 animate-spin opacity-50" />
+          <p>טוען בקשות...</p>
+        </div>
       ) : filteredSwaps.length === 0 ? (
         <div className="text-center py-10 text-gray-400">
           <RefreshCw className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -159,6 +169,15 @@ export default function ManagerSwaps() {
               </div>
             );
           })}
+        </div>
+      )}
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm text-white z-50 ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        }`}>
+          {toast.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {toast.message}
         </div>
       )}
     </div>

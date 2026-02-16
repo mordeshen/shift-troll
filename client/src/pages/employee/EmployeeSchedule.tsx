@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
-import { Calendar, ArrowRight, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Calendar, ChevronRight, ChevronLeft, RefreshCw, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 interface Assignment {
   id: string;
@@ -29,6 +29,7 @@ export default function EmployeeSchedule() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const baseDate = new Date();
   baseDate.setDate(baseDate.getDate() + weekOffset * 7);
@@ -60,15 +61,20 @@ export default function EmployeeSchedule() {
       .finally(() => setLoading(false));
   }, [weekStart, user?.teamId, user?.id]);
 
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
   const requestSwap = async (assignmentId: string) => {
     try {
       await api.post('/swaps/request', { assignmentId });
-      alert('בקשת החלפה נשלחה!');
-      // Refresh
+      setToast({ message: 'בקשת החלפה נשלחה!', type: 'success' });
       const res = await api.get(`/schedule/${weekStart}/${user?.teamId}`);
       setAssignments(res.data.schedule.filter((a: Assignment) => a.employee.id === user?.id));
     } catch (err: any) {
-      alert(err.response?.data?.error || 'שגיאה');
+      setToast({ message: err.response?.data?.error || 'שגיאה', type: 'error' });
     }
   };
 
@@ -77,18 +83,21 @@ export default function EmployeeSchedule() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold">המשמרות שלי</h2>
         <div className="flex items-center gap-2">
-          <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 hover:bg-gray-100 rounded-lg">
-            <ArrowRight className="w-5 h-5" />
+          <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="שבוע הבא">
+            <ChevronRight className="w-5 h-5" />
           </button>
           <span className="text-sm font-medium px-3">{days[0].display} — {days[6].display}</span>
-          <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 hover:bg-gray-100 rounded-lg">
-            <ArrowLeft className="w-5 h-5" />
+          <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="שבוע קודם">
+            <ChevronLeft className="w-5 h-5" />
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="text-center py-10 text-gray-400">טוען...</div>
+        <div className="text-center py-10 text-gray-400">
+          <Loader2 className="w-8 h-8 mx-auto mb-3 animate-spin opacity-50" />
+          <p>טוען משמרות...</p>
+        </div>
       ) : assignments.length === 0 ? (
         <div className="text-center py-10 text-gray-400">
           <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -115,7 +124,7 @@ export default function EmployeeSchedule() {
                       {a.status === 'published' && (
                         <button
                           onClick={() => requestSwap(a.id)}
-                          className="flex items-center gap-1 text-xs px-3 py-1.5 bg-white/50 rounded-lg hover:bg-white/80 transition-colors"
+                          className="flex items-center gap-1 text-xs px-3 py-1.5 bg-white/70 rounded-lg hover:bg-white transition-colors"
                         >
                           <RefreshCw className="w-3 h-3" />
                           בקש החלפה
@@ -127,6 +136,16 @@ export default function EmployeeSchedule() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm text-white z-50 ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        }`}>
+          {toast.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {toast.message}
         </div>
       )}
     </div>

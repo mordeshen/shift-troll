@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Search, Check, AlertCircle, Plus, Pencil, Save, X, Copy, Users, UserPlus } from 'lucide-react';
+import { Search, Check, AlertCircle, Plus, Pencil, Save, X, Copy, Users, UserPlus, Loader2 } from 'lucide-react';
 
 interface Team {
   id: string;
@@ -193,7 +193,10 @@ export default function ManagerEmployees() {
 
       {/* Table */}
       {loading ? (
-        <div className="text-center py-10 text-gray-400">טוען...</div>
+        <div className="text-center py-10 text-gray-400">
+          <Loader2 className="w-8 h-8 mx-auto mb-3 animate-spin opacity-50" />
+          <p>טוען עובדים...</p>
+        </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full">

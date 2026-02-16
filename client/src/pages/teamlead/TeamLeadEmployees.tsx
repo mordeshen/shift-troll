@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Search, User, Tag, Clock, Brain, Plus, X, AlertTriangle, Lightbulb, ThumbsUp } from 'lucide-react';
+import { Search, User, Tag, Clock, Brain, Plus, X, AlertTriangle, Lightbulb, ThumbsUp, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 interface Employee {
   id: string;
@@ -82,6 +82,13 @@ export default function TeamLeadEmployees() {
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
   const [customTag, setCustomTag] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // Event form state
   const [eventForm, setEventForm] = useState({
@@ -125,7 +132,7 @@ export default function TeamLeadEmployees() {
         setEmployees(res.data);
       }
     } catch (err: any) {
-      alert(err.response?.data?.error || 'שגיאה בהוספת תג');
+      setToast({ message: err.response?.data?.error || 'שגיאה בהוספת תג', type: 'error' });
     }
   };
 
@@ -140,7 +147,7 @@ export default function TeamLeadEmployees() {
         setEmployees(res.data);
       }
     } catch {
-      alert('שגיאה בהסרת תג');
+      setToast({ message: 'שגיאה בהסרת תג', type: 'error' });
     }
   };
 
@@ -156,7 +163,7 @@ export default function TeamLeadEmployees() {
       setSelectedEmployee(res.data.find((e: Employee) => e.id === selectedEmployee.id) || null);
       setEmployees(res.data);
     } catch {
-      alert('שגיאה בהוספת אירוע');
+      setToast({ message: 'שגיאה בהוספת אירוע', type: 'error' });
     }
   };
 
@@ -170,7 +177,7 @@ export default function TeamLeadEmployees() {
       setSelectedEmployee(res.data.find((e: Employee) => e.id === selectedEmployee.id) || null);
       setEmployees(res.data);
     } catch {
-      alert('שגיאה במחיקת אירוע');
+      setToast({ message: 'שגיאה במחיקת אירוע', type: 'error' });
     }
   };
 
@@ -221,7 +228,10 @@ export default function TeamLeadEmployees() {
 
           <div className="flex-1 overflow-y-auto p-2">
             {loading ? (
-              <div className="text-center py-10 text-gray-400 text-sm">טוען...</div>
+              <div className="text-center py-10 text-gray-400 text-sm">
+                <Loader2 className="w-6 h-6 mx-auto mb-2 animate-spin opacity-50" />
+                <p>טוען...</p>
+              </div>
             ) : (
               filteredEmployees.map(emp => {
                 const status = getEmployeeStatus(emp);
@@ -561,6 +571,15 @@ export default function TeamLeadEmployees() {
           </div>
         )}
       </div>
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm text-white z-50 ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        }`}>
+          {toast.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }

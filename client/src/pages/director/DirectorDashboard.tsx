@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { Brain, AlertTriangle, TrendingUp, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { Brain, AlertTriangle, TrendingUp, Users, ChevronDown, ChevronUp, AlertCircle, Loader2 } from 'lucide-react';
 
 interface TeamBurnout {
   teamId: string;
@@ -49,6 +49,13 @@ export default function DirectorDashboard() {
   const [predictLoading, setPredictLoading] = useState(false);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     Promise.all([
@@ -68,7 +75,7 @@ export default function DirectorDashboard() {
       const res = await api.post('/director/predict');
       setPredictions(res.data.predictions || []);
     } catch {
-      alert('שגיאה בקבלת חיזוי');
+      setToast({ message: 'שגיאה בקבלת חיזוי', type: 'error' });
     } finally {
       setPredictLoading(false);
     }
@@ -80,7 +87,12 @@ export default function DirectorDashboard() {
   ] : [];
 
   if (loading) {
-    return <div className="text-center py-20 text-gray-400">טוען Dashboard...</div>;
+    return (
+      <div className="text-center py-20 text-gray-400">
+        <Loader2 className="w-8 h-8 mx-auto mb-3 animate-spin opacity-50" />
+        <p>טוען Dashboard...</p>
+      </div>
+    );
   }
 
   return (
@@ -276,6 +288,15 @@ export default function DirectorDashboard() {
           </div>
         )}
       </div>
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm text-white z-50 ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        }`}>
+          <AlertCircle className="w-4 h-4" />
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }
