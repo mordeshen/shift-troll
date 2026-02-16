@@ -7,6 +7,11 @@ import { PrismaClient } from '@prisma/client';
 
 dotenv.config();
 
+// Railway uses DATABASE_PUBLIC_URL, Prisma expects DATABASE_URL
+if (!process.env.DATABASE_URL && process.env.DATABASE_PUBLIC_URL) {
+  process.env.DATABASE_URL = process.env.DATABASE_PUBLIC_URL;
+}
+
 console.log('Starting server...');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('PORT:', process.env.PORT);
