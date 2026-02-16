@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Calendar, AlertCircle } from 'lucide-react';
 
@@ -77,6 +77,12 @@ export default function Login() {
             {loading ? 'מתחבר...' : 'התחבר'}
           </button>
         </form>
+
+        <div className="mt-4 text-center">
+          <Link to="/register" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+            עובד חדש? הירשם כאן
+          </Link>
+        </div>
 
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-xs text-gray-400 text-center">סיסמה לכולם: 123456</p>

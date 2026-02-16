@@ -1,12 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
+const ALL_ROLES = ['team_lead', 'manager', 'director', 'employee'];
+
 export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
     role: string;
     teamId?: string;
+    combinedRole: boolean;
+    effectiveRoles: string[];
   };
 }
 
@@ -20,11 +24,14 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as any;
+    const combinedRole = decoded.combinedRole === true;
     req.user = {
       id: decoded.id,
       email: decoded.email,
       role: decoded.role,
       teamId: decoded.teamId,
+      combinedRole,
+      effectiveRoles: combinedRole ? ALL_ROLES : [decoded.role],
     };
     next();
   } catch {
@@ -34,7 +41,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
 
 export function authorize(...roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user || !req.user.effectiveRoles.some(r => roles.includes(r))) {
       res.status(403).json({ error: 'אין הרשאה לפעולה זו' });
       return;
     }

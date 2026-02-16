@@ -32,8 +32,8 @@ router.get('/:teamId/employees', authenticate, authorize('team_lead', 'manager',
       },
     });
 
-    // If team_lead, verify they lead this team
-    if (req.user!.role === 'team_lead') {
+    // If user only has team_lead role (no director access), verify they lead this team
+    if (req.user!.role === 'team_lead' && !req.user!.effectiveRoles.includes('director')) {
       const team = await prisma.team.findUnique({ where: { id: teamId } });
       if (!team || team.leadId !== req.user!.id) {
         res.status(403).json({ error: 'אין הרשאה לצוות זה' });
@@ -249,12 +249,14 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   const prisma = getPrisma(req);
   try {
     let teams: any[];
-    if (req.user!.role === 'director') {
-      teams = await prisma.team.findMany({ include: { employees: { select: { id: true, name: true } }, lead: { select: { id: true, name: true } } } });
-    } else if (req.user!.role === 'manager') {
-      teams = await prisma.team.findMany({ where: { managerId: req.user!.id }, include: { employees: { select: { id: true, name: true } }, lead: { select: { id: true, name: true } } } });
-    } else if (req.user!.role === 'team_lead') {
-      teams = await prisma.team.findMany({ where: { leadId: req.user!.id }, include: { employees: { select: { id: true, name: true } }, lead: { select: { id: true, name: true } } } });
+    const effectiveRoles = req.user!.effectiveRoles;
+    const include = { employees: { select: { id: true, name: true } }, lead: { select: { id: true, name: true } } };
+    if (effectiveRoles.includes('director')) {
+      teams = await prisma.team.findMany({ include });
+    } else if (effectiveRoles.includes('manager')) {
+      teams = await prisma.team.findMany({ where: { managerId: req.user!.id }, include });
+    } else if (effectiveRoles.includes('team_lead')) {
+      teams = await prisma.team.findMany({ where: { leadId: req.user!.id }, include });
     } else {
       teams = [];
     }

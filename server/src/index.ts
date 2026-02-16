@@ -55,6 +55,8 @@ try {
   const ratingRoutes = require('./routes/ratings').default;
   const statsRoutes = require('./routes/stats').default;
   const directorRoutes = require('./routes/director').default;
+  const employeeManageRoutes = require('./routes/employees').default;
+  const adminRoutes = require('./routes/admin').default;
 
   app.use('/api/auth', authRoutes);
   app.use('/api/constraints', constraintRoutes);
@@ -64,6 +66,8 @@ try {
   app.use('/api/employees', ratingRoutes);
   app.use('/api/stats', statsRoutes);
   app.use('/api/director', directorRoutes);
+  app.use('/api/manage/employees', employeeManageRoutes);
+  app.use('/api/admin', adminRoutes);
   console.log('All routes loaded successfully');
 } catch (err) {
   console.error('Error loading routes:', err);

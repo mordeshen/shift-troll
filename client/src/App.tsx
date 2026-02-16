@@ -10,6 +10,10 @@ import ManagerSwaps from './pages/manager/ManagerSwaps';
 import ManagerRatings from './pages/manager/ManagerRatings';
 import ManagerStats from './pages/manager/ManagerStats';
 import DirectorDashboard from './pages/director/DirectorDashboard';
+import ManageRoles from './pages/director/ManageRoles';
+import Admin from './pages/Admin';
+import Register from './pages/Register';
+import ManagerEmployees from './pages/manager/ManagerEmployees';
 
 function RoleRedirect() {
   const { user, loading } = useAuth();
@@ -31,7 +35,7 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles:
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">טוען...</div>;
   if (!user) return <Navigate to="/login" />;
-  if (!roles.includes(user.role)) return <Navigate to="/" />;
+  if (!user.effectiveRoles?.some(r => roles.includes(r))) return <Navigate to="/" />;
 
   return <>{children}</>;
 }
@@ -42,6 +46,8 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/" element={<RoleRedirect />} />
 
           {/* Employee Routes */}
@@ -58,6 +64,7 @@ function App() {
           {/* Manager Routes */}
           <Route element={<ProtectedRoute roles={['manager']}><Layout /></ProtectedRoute>}>
             <Route path="/manager/schedule" element={<ManagerSchedule />} />
+            <Route path="/manager/employees" element={<ManagerEmployees />} />
             <Route path="/manager/swaps" element={<ManagerSwaps />} />
             <Route path="/manager/ratings" element={<ManagerRatings />} />
             <Route path="/manager/stats" element={<ManagerStats />} />
@@ -66,6 +73,7 @@ function App() {
           {/* Director Routes */}
           <Route element={<ProtectedRoute roles={['director']}><Layout /></ProtectedRoute>}>
             <Route path="/director/dashboard" element={<DirectorDashboard />} />
+            <Route path="/director/manage-roles" element={<ManageRoles />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" />} />

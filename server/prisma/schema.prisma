@@ -14,8 +14,10 @@ model Employee {
   password      String
   phone         String?
   role          String            @default("employee") // "employee" | "team_lead" | "manager" | "director"
+  combinedRole  Boolean           @default(false)
   teamId        String?
   team          Team?             @relation("teamMembers", fields: [teamId], references: [id])
+  birthYear     Int?
   seniority     Int               @default(0)
   swapPoints    Int               @default(3)
   constraints   Constraint[]
