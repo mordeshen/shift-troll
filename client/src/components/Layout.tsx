@@ -27,6 +27,7 @@ const navByRole: Record<string, NavItem[]> = {
   ],
   manager: [
     { path: '/manager/schedule', label: 'לוח שיבוץ', icon: Calendar, section: 'מנהל' },
+    { path: '/manager/conversation', label: 'שיחת הכנה', icon: MessageSquare },
     { path: '/manager/employees', label: 'ניהול עובדים', icon: Users },
     { path: '/manager/swaps', label: 'לוח החלפות', icon: Settings },
     { path: '/manager/ratings', label: 'דירוג עובדים', icon: BarChart3 },

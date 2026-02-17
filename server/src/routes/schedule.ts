@@ -11,7 +11,7 @@ function getPrisma(req: Request): PrismaClient {
 // Generate schedule
 router.post('/generate', authenticate, authorize('manager', 'director'), async (req: AuthRequest, res: Response) => {
   const prisma = getPrisma(req);
-  const { weekStart, teamId } = req.body;
+  const { weekStart, teamId, conversationId } = req.body;
 
   if (!weekStart || !teamId) {
     res.status(400).json({ error: 'נדרשים תאריך התחלה וצוות' });
@@ -37,6 +37,25 @@ router.post('/generate', authenticate, authorize('manager', 'director'), async (
         },
       },
     });
+
+    // Load approved conversation constraints if available
+    let convConstraints: any[] = [];
+    let activeConversationId: string | null = conversationId || null;
+
+    if (!activeConversationId) {
+      // Try to find a completed conversation for this week/team
+      const conversation = await prisma.managerConversation.findFirst({
+        where: { teamId, weekStart: weekStartDate, type: 'preparation', status: 'completed' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (conversation) activeConversationId = conversation.id;
+    }
+
+    if (activeConversationId) {
+      convConstraints = await prisma.conversationConstraint.findMany({
+        where: { conversationId: activeConversationId, approved: true },
+      });
+    }
 
     // Get shift templates
     const templates = await prisma.shiftTemplate.findMany({ where: { teamId } });
@@ -138,6 +157,42 @@ router.post('/generate', authenticate, authorize('manager', 'director'), async (
 
           if (availabilityScore === 0) continue;
 
+          // Check conversation hard constraints — separation
+          const separationConstraints = convConstraints.filter(
+            cc => cc.type === 'hard' && cc.category === 'separation' && cc.affectedEmployees.includes(emp.id)
+          );
+
+          // Check workload hard constraints
+          const workloadConstraint = convConstraints.find(
+            cc => cc.type === 'hard' && cc.category === 'workload' && cc.affectedEmployees.includes(emp.id)
+          );
+          if (workloadConstraint) {
+            const params = workloadConstraint.parameters as any;
+            if (params?.max_shifts) {
+              const currentCount = employeeShiftCount.get(emp.id) || 0;
+              if (currentCount >= params.max_shifts) continue;
+            }
+            if (params?.preferred_types && Array.isArray(params.preferred_types)) {
+              const shiftTypeMap: Record<string, string> = { 'morning': 'בוקר', 'evening': 'ערב', 'night': 'לילה' };
+              const preferredHebrew = params.preferred_types.map((t: string) => shiftTypeMap[t] || t);
+              if (preferredHebrew.length > 0 && !preferredHebrew.includes('any') && !preferredHebrew.includes(template.name)) {
+                availabilityScore = Math.max(availabilityScore - 1, 1); // Reduce but don't eliminate
+              }
+            }
+          }
+
+          // Check burnout constraint
+          const burnoutConstraint = convConstraints.find(
+            cc => (cc.type === 'hard' || cc.type === 'soft') && cc.category === 'burnout' && cc.affectedEmployees.includes(emp.id)
+          );
+          if (burnoutConstraint) {
+            const params = burnoutConstraint.parameters as any;
+            if (params?.max_shifts && burnoutConstraint.type === 'hard') {
+              const currentCount = employeeShiftCount.get(emp.id) || 0;
+              if (currentCount >= params.max_shifts) continue;
+            }
+          }
+
           // Rating score
           const ratings = emp.ratings;
           let ratingScore = 3;
@@ -161,12 +216,45 @@ router.post('/generate', authenticate, authorize('manager', 'director'), async (
           const tagMatch = template.requiredTags.length === 0 ? 1 :
             template.requiredTags.some(t => emp.tags.some(et => et.tag === t)) ? 1 : 0;
 
+          // Conversation-based scoring adjustments
+          let convBonus = 0;
+
+          // Utilization bonus — employee who wants more shifts
+          const utilizationConstraint = convConstraints.find(
+            cc => cc.category === 'utilization' && cc.affectedEmployees.includes(emp.id) && cc.approved
+          );
+          if (utilizationConstraint) {
+            convBonus += 0.05;
+          }
+
+          // Development pairing bonus
+          const developmentConstraint = convConstraints.find(
+            cc => cc.category === 'development' && cc.affectedEmployees.includes(emp.id) && cc.approved
+          );
+          if (developmentConstraint) {
+            const params = developmentConstraint.parameters as any;
+            if (params?.shift_types) {
+              const shiftTypeMap: Record<string, string> = { 'morning': 'בוקר', 'evening': 'ערב', 'night': 'לילה', 'closing': 'ערב' };
+              const targetShifts = params.shift_types.map((t: string) => shiftTypeMap[t] || t);
+              if (targetShifts.includes(template.name)) {
+                convBonus += 0.08;
+              }
+            }
+          }
+
+          // Burnout reduction penalty (soft)
+          if (burnoutConstraint && burnoutConstraint.type === 'soft') {
+            convBonus -= 0.05;
+          }
+
           const totalScore =
-            (ratingScore / 5) * 0.3 +
-            Math.max(0, Math.min(1, fairnessScore)) * 0.3 +
+            (ratingScore / 5) * 0.25 +
+            Math.max(0, Math.min(1, fairnessScore)) * 0.25 +
             (availabilityScore / 3) * 0.2 +
             swapScore * 0.1 +
-            tagMatch * 0.1;
+            tagMatch * 0.1 +
+            convBonus +
+            0.1; // base normalization
 
           available.push({ id: emp.id, score: totalScore });
         }
@@ -194,6 +282,28 @@ router.post('/generate', authenticate, authorize('manager', 'director'), async (
         // Check 6 consecutive days rule
         const empDays = employeeConsecutiveDays.get(candidate.id)!;
         const dayStr = slot.day.toISOString().split('T')[0];
+
+        // Check separation constraints — don't assign together
+        let separationViolation = false;
+        for (const cc of convConstraints.filter(c => c.category === 'separation' && c.approved)) {
+          if (cc.affectedEmployees.includes(candidate.id)) {
+            const otherIds = cc.affectedEmployees.filter((eid: string) => eid !== candidate.id);
+            const params = cc.parameters as any;
+            const shiftTypeMap: Record<string, string> = { 'morning': 'בוקר', 'evening': 'ערב', 'night': 'לילה' };
+            const shiftTypes = params?.shift_types?.map((t: string) => shiftTypeMap[t] || t) || [];
+            // If shift_types specified, only enforce for those shifts; otherwise all
+            if (shiftTypes.length === 0 || shiftTypes.includes(slot.template.name)) {
+              if (otherIds.some((oid: string) => assigned.includes(oid))) {
+                if (cc.type === 'hard') {
+                  separationViolation = true;
+                  break;
+                }
+                // Soft separation — add warning but allow
+              }
+            }
+          }
+        }
+        if (separationViolation) continue;
 
         // Check night→morning transition
         const lastShift = employeeLastShift.get(`${candidate.id}_${slot.dayIndex - 1}`);
@@ -232,6 +342,21 @@ router.post('/generate', authenticate, authorize('manager', 'director'), async (
         }
       }
 
+      // Check soft separation violations
+      for (const cc of convConstraints.filter(c => c.category === 'separation' && c.type === 'soft' && c.approved)) {
+        const params = cc.parameters as any;
+        const shiftTypeMap: Record<string, string> = { 'morning': 'בוקר', 'evening': 'ערב', 'night': 'לילה' };
+        const shiftTypes = params?.shift_types?.map((t: string) => shiftTypeMap[t] || t) || [];
+        if (shiftTypes.length === 0 || shiftTypes.includes(slot.template.name)) {
+          const affectedInSlot = cc.affectedEmployees.filter((eid: string) => assigned.includes(eid));
+          if (affectedInSlot.length > 1) {
+            const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+            const names = affectedInSlot.map((eid: string) => employees.find(e => e.id === eid)?.name || eid);
+            warnings.push(`${names.join(' ו-')} שובצו ביחד ביום ${dayNames[slot.dayIndex]} ${slot.template.name} (מהשיחה: ${cc.description})`);
+          }
+        }
+      }
+
       // Check for required tags
       if (slot.template.requiredTags.length > 0) {
         const assignedEmps = assigned.map(id => employees.find(e => e.id === id)!);
@@ -244,11 +369,57 @@ router.post('/generate', authenticate, authorize('manager', 'director'), async (
       }
     }
 
+    // Build reasoning for each assignment
+    const reasoningMap = new Map<string, any>();
+
+    for (const [key, empIds] of assignments) {
+      const [dateStr, shiftName] = key.split('_');
+      for (const empId of empIds) {
+        const emp = employees.find(e => e.id === empId);
+        const reasons: string[] = [];
+
+        // Check employee constraint
+        const constraint = emp?.constraints.find(c => c.date.toISOString().split('T')[0] === dateStr);
+        if (constraint) {
+          if (constraint.availability === 'available_extra') {
+            reasons.push('העובד/ת הצהיר/ה זמינות נוספת');
+          } else if (constraint.type === 'soft') {
+            reasons.push(`שובץ למרות העדפה שלא (${constraint.reason || 'אילוץ רך'})`);
+          }
+        } else {
+          reasons.push('זמין/ה לפי ברירת מחדל');
+        }
+
+        // Check conversation constraints that influenced this
+        for (const cc of convConstraints.filter(c => c.approved)) {
+          if (cc.affectedEmployees.includes(empId)) {
+            if (cc.category === 'separation') {
+              reasons.push(`הפרדה: ${cc.description}`);
+            } else if (cc.category === 'development') {
+              reasons.push(`הזדמנות פיתוח: ${cc.description}`);
+            } else if (cc.category === 'utilization') {
+              reasons.push(`ניצול מוטיבציה: ${cc.description}`);
+            } else if (cc.category === 'burnout' || cc.category === 'workload') {
+              reasons.push(`הפחתת עומס: ${cc.description}`);
+            } else if (cc.category === 'pairing') {
+              reasons.push(`שיבוץ משותף: ${cc.description}`);
+            }
+          }
+        }
+
+        reasoningMap.set(`${empId}_${dateStr}_${shiftName}`, {
+          reasons,
+          conversationInfluenced: reasons.some(r => r.includes('הפרדה') || r.includes('הזדמנות') || r.includes('ניצול') || r.includes('הפחתת') || r.includes('שיבוץ משותף')),
+        });
+      }
+    }
+
     // Save assignments to DB
     const dbAssignments = [];
     for (const [key, empIds] of assignments) {
       const [dateStr, shiftName] = key.split('_');
       for (const empId of empIds) {
+        const reasoning = reasoningMap.get(`${empId}_${dateStr}_${shiftName}`) || null;
         dbAssignments.push({
           employeeId: empId,
           date: new Date(dateStr),
@@ -256,6 +427,8 @@ router.post('/generate', authenticate, authorize('manager', 'director'), async (
           status: 'draft',
           weekStart: weekStartDate,
           teamId,
+          conversationId: activeConversationId || undefined,
+          aiReasoning: reasoning,
         });
       }
     }
@@ -292,7 +465,13 @@ router.get('/:weekStart/:teamId', authenticate, async (req: AuthRequest, res: Re
 
     const warnings = await generateWarnings(prisma, new Date(weekStart), teamId);
 
-    res.json({ schedule, warnings });
+    // Check if there's a conversation for this week
+    const conversation = await prisma.managerConversation.findFirst({
+      where: { teamId, weekStart: new Date(weekStart), type: 'preparation' },
+      select: { id: true, status: true },
+    });
+
+    res.json({ schedule, warnings, conversationId: conversation?.id, conversationStatus: conversation?.status });
   } catch (error) {
     console.error('Get schedule error:', error);
     res.status(500).json({ error: 'שגיאה בקבלת הסידור' });

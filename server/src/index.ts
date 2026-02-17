@@ -57,6 +57,7 @@ try {
   const directorRoutes = require('./routes/director').default;
   const employeeManageRoutes = require('./routes/employees').default;
   const adminRoutes = require('./routes/admin').default;
+  const conversationRoutes = require('./routes/conversations').default;
 
   app.use('/api/auth', authRoutes);
   app.use('/api/constraints', constraintRoutes);
@@ -68,6 +69,7 @@ try {
   app.use('/api/director', directorRoutes);
   app.use('/api/manage/employees', employeeManageRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/conversations', conversationRoutes);
   console.log('All routes loaded successfully');
 } catch (err) {
   console.error('Error loading routes:', err);

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
-import { ChevronRight, ChevronLeft, Zap, Send, AlertTriangle, GripVertical, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Zap, Send, AlertTriangle, GripVertical, Check, AlertCircle, Loader2, MessageSquare, Info, X, Brain } from 'lucide-react';
 
 interface Assignment {
   id: string;
@@ -9,6 +10,11 @@ interface Assignment {
   date: string;
   shiftName: string;
   status: string;
+  conversationId?: string;
+  aiReasoning?: {
+    reasons: string[];
+    conversationInfluenced: boolean;
+  };
   employee: { id: string; name: string; tags?: { tag: string }[] };
 }
 
@@ -24,6 +30,7 @@ function getWeekStart(offset: number): string {
 
 export default function ManagerSchedule() {
   useAuth();
+  const navigate = useNavigate();
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeam, setSelectedTeam] = useState('');
   const [weekOffset, setWeekOffset] = useState(1);
@@ -33,6 +40,8 @@ export default function ManagerSchedule() {
   const [generating, setGenerating] = useState(false);
   const [dragItem, setDragItem] = useState<Assignment | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [conversationStatus, setConversationStatus] = useState<string | null>(null);
 
   const weekStart = getWeekStart(weekOffset);
   const days: { date: string; name: string; display: string }[] = [];
@@ -70,9 +79,11 @@ export default function ManagerSchedule() {
       const res = await api.get(`/schedule/${weekStart}/${selectedTeam}`);
       setSchedule(res.data.schedule);
       setWarnings(res.data.warnings || []);
+      setConversationStatus(res.data.conversationStatus || null);
     } catch {
       setSchedule([]);
       setWarnings([]);
+      setConversationStatus(null);
     } finally {
       setLoading(false);
     }
@@ -122,19 +133,18 @@ export default function ManagerSchedule() {
   const getCellColor = (date: string, shiftName: string) => {
     const assignments = getAssignments(date, shiftName);
     if (assignments.length === 0) return 'bg-red-50';
-    // Check if any soft constraint violated
     const hasWarning = warnings.some(w => w.includes(shiftName) && w.includes(DAY_NAMES[days.findIndex(d => d.date === date)]));
     if (hasWarning) return 'bg-yellow-50';
     return 'bg-white';
   };
 
   const isDraft = schedule.some(a => a.status === 'draft');
-
+  const hasConversationInfluence = schedule.some(a => a.aiReasoning?.conversationInfluenced);
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between mb-6 gap-3">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-bold">לוח שיבוץ</h2>
           {teams.length > 1 && (
@@ -150,7 +160,7 @@ export default function ManagerSchedule() {
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="שבוע הבא">
               <ChevronRight className="w-5 h-5" />
@@ -160,6 +170,18 @@ export default function ManagerSchedule() {
               <ChevronLeft className="w-5 h-5" />
             </button>
           </div>
+
+          <button
+            onClick={() => navigate('/manager/conversation')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
+              conversationStatus === 'completed'
+                ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                : 'bg-purple-600 text-white hover:bg-purple-700'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            {conversationStatus === 'completed' ? 'שיחה הושלמה' : 'שיחת הכנה'}
+          </button>
 
           <button
             onClick={generateSchedule}
@@ -181,6 +203,14 @@ export default function ManagerSchedule() {
           )}
         </div>
       </div>
+
+      {/* Conversation influence badge */}
+      {hasConversationInfluence && (
+        <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-4 flex items-center gap-2">
+          <Brain className="w-5 h-5 text-purple-600" />
+          <span className="text-sm text-purple-700">הסידור מושפע משיחת ההכנה — לחץ על שיבוץ לפרטים</span>
+        </div>
+      )}
 
       {/* Warnings */}
       {warnings.length > 0 && (
@@ -235,7 +265,8 @@ export default function ManagerSchedule() {
                               key={a.id}
                               draggable
                               onDragStart={() => setDragItem(a)}
-                              className={`flex items-center gap-1 px-2 py-1.5 rounded text-xs cursor-grab active:cursor-grabbing transition-colors ${
+                              onClick={() => setSelectedAssignment(a)}
+                              className={`flex items-center gap-1 px-2 py-1.5 rounded text-xs cursor-grab active:cursor-grabbing transition-colors relative group ${
                                 a.status === 'draft' ? 'bg-blue-100 text-blue-800' :
                                 a.status === 'published' ? 'bg-green-100 text-green-800' :
                                 a.status === 'swap_requested' ? 'bg-orange-100 text-orange-800' :
@@ -244,6 +275,9 @@ export default function ManagerSchedule() {
                             >
                               <GripVertical className="w-3 h-3 opacity-40" />
                               <span className="truncate">{a.employee.name}</span>
+                              {a.aiReasoning?.conversationInfluenced && (
+                                <Brain className="w-3 h-3 text-purple-500 shrink-0" />
+                              )}
                             </div>
                           ))}
                           {cellAssignments.length === 0 && (
@@ -261,7 +295,7 @@ export default function ManagerSchedule() {
       )}
 
       {/* Legend */}
-      <div className="flex items-center gap-6 mt-4 text-xs text-gray-500">
+      <div className="flex flex-wrap items-center gap-6 mt-4 text-xs text-gray-500">
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-blue-100" /> טיוטה
         </div>
@@ -277,7 +311,70 @@ export default function ManagerSchedule() {
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-red-50 border border-red-200" /> חסרים עובדים
         </div>
+        {hasConversationInfluence && (
+          <div className="flex items-center gap-1">
+            <Brain className="w-3 h-3 text-purple-500" /> מושפע משיחה
+          </div>
+        )}
       </div>
+
+      {/* Reasoning Popover */}
+      {selectedAssignment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setSelectedAssignment(null)} />
+          <div className="relative bg-white rounded-xl shadow-xl border border-gray-200 p-5 max-w-sm w-full mx-4">
+            <button
+              onClick={() => setSelectedAssignment(null)}
+              className="absolute top-3 left-3 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                selectedAssignment.aiReasoning?.conversationInfluenced
+                  ? 'bg-purple-100 text-purple-700'
+                  : 'bg-blue-100 text-blue-700'
+              }`}>
+                {selectedAssignment.employee.name.charAt(0)}
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900">{selectedAssignment.employee.name}</h4>
+                <p className="text-xs text-gray-500">
+                  {selectedAssignment.shiftName} — {
+                    DAY_NAMES[new Date(selectedAssignment.date).getDay()]
+                  } {new Date(selectedAssignment.date).getDate()}/{new Date(selectedAssignment.date).getMonth() + 1}
+                </p>
+              </div>
+            </div>
+
+            {selectedAssignment.aiReasoning ? (
+              <div>
+                <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                  <Info className="w-4 h-4" />
+                  למה ככה:
+                </h5>
+                <ul className="space-y-1.5">
+                  {selectedAssignment.aiReasoning.reasons.map((reason, i) => (
+                    <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                      <span className="text-gray-400 mt-0.5">•</span>
+                      <span>{reason}</span>
+                    </li>
+                  ))}
+                </ul>
+                {selectedAssignment.aiReasoning.conversationInfluenced && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-1.5 text-xs text-purple-600">
+                    <Brain className="w-3.5 h-3.5" />
+                    שיבוץ זה הושפע משיחת ההכנה
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">אין מידע נוסף על שיבוץ זה</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (

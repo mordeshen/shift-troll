@@ -27,9 +27,10 @@ model Employee {
   assignments   ShiftAssignment[]
   swapRequests  SwapRequest[]     @relation("requester")
   swapCovers    SwapRequest[]     @relation("coverer")
-  ledTeams      Team[]            @relation("teamLead")
-  managedTeams  Team[]            @relation("manager")
-  createdAt     DateTime          @default(now())
+  ledTeams               Team[]                  @relation("teamLead")
+  managedTeams           Team[]                  @relation("manager")
+  managerConversations   ManagerConversation[]   @relation("managerConversations")
+  createdAt              DateTime                @default(now())
 }
 
 model Team {
@@ -39,9 +40,10 @@ model Team {
   lead            Employee          @relation("teamLead", fields: [leadId], references: [id])
   managerId       String
   manager         Employee          @relation("manager", fields: [managerId], references: [id])
-  employees       Employee[]        @relation("teamMembers")
-  shiftTemplates  ShiftTemplate[]
-  createdAt       DateTime          @default(now())
+  employees              Employee[]              @relation("teamMembers")
+  shiftTemplates         ShiftTemplate[]
+  managerConversations   ManagerConversation[]
+  createdAt              DateTime                @default(now())
 }
 
 model Constraint {
@@ -98,15 +100,18 @@ model ShiftTemplate {
 }
 
 model ShiftAssignment {
-  id         String   @id @default(uuid())
-  employeeId String
-  employee   Employee @relation(fields: [employeeId], references: [id])
-  date       DateTime
-  shiftName  String
-  status     String   @default("draft") // "draft" | "published" | "swap_requested" | "swapped"
-  weekStart  DateTime
-  teamId     String
-  createdAt  DateTime @default(now())
+  id             String   @id @default(uuid())
+  employeeId     String
+  employee       Employee @relation(fields: [employeeId], references: [id])
+  date           DateTime
+  shiftName      String
+  status         String   @default("draft") // "draft" | "published" | "swap_requested" | "swapped"
+  weekStart      DateTime
+  teamId         String
+  conversationId String?
+  conversation   ManagerConversation? @relation(fields: [conversationId], references: [id])
+  aiReasoning    Json?
+  createdAt      DateTime @default(now())
 }
 
 model SwapRequest {
@@ -133,4 +138,38 @@ model Rating {
   ratedAt    DateTime @default(now())
 
   @@unique([employeeId, category, ratedBy])
+}
+
+model ManagerConversation {
+  id                String                 @id @default(uuid())
+  managerId         String
+  manager           Employee               @relation("managerConversations", fields: [managerId], references: [id])
+  teamId            String
+  team              Team                   @relation(fields: [teamId], references: [id])
+  weekStart         DateTime
+  type              String                 @default("preparation") // "preparation" | "retrospective"
+  messages          Json                   @default("[]")
+  extractedInsights Json?
+  status            String                 @default("active") // "active" | "completed"
+  constraints       ConversationConstraint[]
+  assignments       ShiftAssignment[]
+  createdAt         DateTime               @default(now())
+  completedAt       DateTime?
+
+  @@unique([managerId, teamId, weekStart, type])
+}
+
+model ConversationConstraint {
+  id                String              @id @default(uuid())
+  conversationId    String
+  conversation      ManagerConversation @relation(fields: [conversationId], references: [id])
+  type              String              // "hard" | "soft" | "opportunity"
+  category          String              // "separation" | "workload" | "development" | "pairing" | "utilization" | "burnout"
+  description       String
+  affectedEmployees String[]
+  parameters        Json?
+  reasoning         String?
+  priority          Int                 @default(5) // 1-10
+  approved          Boolean             @default(false)
+  createdAt         DateTime            @default(now())
 }

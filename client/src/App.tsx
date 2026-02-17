@@ -14,6 +14,7 @@ import ManageRoles from './pages/director/ManageRoles';
 import Admin from './pages/Admin';
 import Register from './pages/Register';
 import ManagerEmployees from './pages/manager/ManagerEmployees';
+import ManagerConversation from './pages/manager/ManagerConversation';
 
 function RoleRedirect() {
   const { user, loading } = useAuth();
@@ -64,6 +65,7 @@ function App() {
           {/* Manager Routes */}
           <Route element={<ProtectedRoute roles={['manager']}><Layout /></ProtectedRoute>}>
             <Route path="/manager/schedule" element={<ManagerSchedule />} />
+            <Route path="/manager/conversation" element={<ManagerConversation />} />
             <Route path="/manager/employees" element={<ManagerEmployees />} />
             <Route path="/manager/swaps" element={<ManagerSwaps />} />
             <Route path="/manager/ratings" element={<ManagerRatings />} />
