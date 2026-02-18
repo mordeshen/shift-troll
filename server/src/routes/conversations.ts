@@ -266,6 +266,12 @@ router.post('/', authenticate, authorize('manager', 'director'), async (req: Aut
       return;
     }
 
+    // Verify API key exists
+    if (!process.env.ANTHROPIC_API_KEY) {
+      res.status(500).json({ error: 'מפתח ANTHROPIC_API_KEY לא מוגדר בשרת' });
+      return;
+    }
+
     // Build context
     const context = await buildConversationContext(prisma, teamId, new Date(weekStart), type);
 
@@ -332,6 +338,11 @@ router.post('/:id/message', authenticate, authorize('manager', 'director'), asyn
 
     if (conversation.status !== 'active') {
       res.status(400).json({ error: 'השיחה כבר הסתיימה' });
+      return;
+    }
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      res.status(500).json({ error: 'מפתח ANTHROPIC_API_KEY לא מוגדר בשרת' });
       return;
     }
 
