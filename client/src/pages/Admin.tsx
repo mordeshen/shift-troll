@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, Plus, Check, AlertCircle, LogOut } from 'lucide-react';
+import { Shield, Plus, Check, AlertCircle, LogOut, Lock } from 'lucide-react';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -48,6 +48,11 @@ export default function Admin() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // Admin login form state
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+
   // Form state
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -91,6 +96,24 @@ export default function Admin() {
       setLoading(false);
     }
   }, []);
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    try {
+      const data = await adminFetch('/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      });
+      localStorage.setItem('adminToken', data.token);
+      localStorage.setItem('adminEmail', data.email);
+      setAdminEmail(data.email);
+    } catch (err: any) {
+      setToast({ message: err.message || 'שגיאה בהתחברות', type: 'error' });
+    } finally {
+      setLoginLoading(false);
+    }
+  };
 
   // Initialize Google Sign-In
   useEffect(() => {
@@ -175,15 +198,51 @@ export default function Admin() {
         </div>
 
         {!adminEmail ? (
-          <div className="text-center">
-            {loading ? (
-              <p className="text-gray-400">מתחבר...</p>
-            ) : !GOOGLE_CLIENT_ID ? (
-              <p className="text-red-500 text-sm">חסר VITE_GOOGLE_CLIENT_ID בהגדרות</p>
-            ) : (
-              <div className="flex justify-center">
-                <div id="google-signin-btn" />
-              </div>
+          <div>
+            {/* Email/Password Login */}
+            <form onSubmit={handleEmailLogin} className="space-y-3 mb-6">
+              <input
+                type="email"
+                placeholder="אימייל אדמין"
+                value={loginEmail}
+                onChange={e => setLoginEmail(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+              />
+              <input
+                type="password"
+                placeholder="סיסמה"
+                value={loginPassword}
+                onChange={e => setLoginPassword(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+              />
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full bg-purple-600 text-white py-2.5 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 transition-colors text-sm flex items-center justify-center gap-2"
+              >
+                <Lock className="w-4 h-4" />
+                {loginLoading ? 'מתחבר...' : 'התחבר כאדמין'}
+              </button>
+            </form>
+
+            {/* Google OAuth divider */}
+            {GOOGLE_CLIENT_ID && (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-1 border-t border-gray-200" />
+                  <span className="text-xs text-gray-400">או</span>
+                  <div className="flex-1 border-t border-gray-200" />
+                </div>
+                <div className="flex justify-center">
+                  {loading ? (
+                    <p className="text-gray-400">מתחבר...</p>
+                  ) : (
+                    <div id="google-signin-btn" />
+                  )}
+                </div>
+              </>
             )}
           </div>
         ) : (

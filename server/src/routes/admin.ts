@@ -38,6 +38,37 @@ function authenticateAdmin(req: AdminRequest, res: Response, next: NextFunction)
 
 // --- Routes ---
 
+// POST /admin/login — email/password admin login
+router.post('/login', async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    res.status(400).json({ error: 'נדרשים אימייל וסיסמה' });
+    return;
+  }
+
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (!adminEmail || !adminPassword) {
+    res.status(500).json({ error: 'הגדרות אדמין חסרות בשרת' });
+    return;
+  }
+
+  if (email.toLowerCase() !== adminEmail.toLowerCase() || password !== adminPassword) {
+    res.status(401).json({ error: 'אימייל או סיסמה שגויים' });
+    return;
+  }
+
+  const token = jwt.sign(
+    { admin: true, email: adminEmail },
+    process.env.JWT_SECRET || 'secret',
+    { expiresIn: '24h' }
+  );
+
+  res.json({ token, email: adminEmail });
+});
+
 // POST /admin/google-login
 router.post('/google-login', async (req: Request, res: Response) => {
   const { credential } = req.body;
