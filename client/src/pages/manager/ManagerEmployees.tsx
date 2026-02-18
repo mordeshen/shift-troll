@@ -187,6 +187,19 @@ export default function ManagerEmployees() {
     }
   };
 
+  // Delete employee
+  const handleDeleteEmployee = async (emp: Employee) => {
+    if (!confirm(`האם אתה בטוח שברצונך למחוק את ${emp.name}?\nפעולה זו אינה ניתנת לביטול.`)) return;
+    try {
+      await api.delete(`/manage/employees/${emp.id}`);
+      setTeamEmployees(prev => prev.filter(e => e.id !== emp.id));
+      setUnassignedEmployees(prev => prev.filter(e => e.id !== emp.id));
+      setToast({ message: `${emp.name} נמחק בהצלחה`, type: 'success' });
+    } catch (err: any) {
+      setToast({ message: err.response?.data?.error || 'שגיאה במחיקת עובד', type: 'error' });
+    }
+  };
+
   // Promote to team_lead
   const handlePromote = async (id: string) => {
     try {
@@ -456,6 +469,9 @@ export default function ManagerEmployees() {
                               <Shield className="w-4 h-4" />
                             </button>
                           )}
+                          <button onClick={() => handleDeleteEmployee(emp)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded" title="מחק עובד">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                           {tab === 'unassigned' && teams.length > 0 && (
                             <select
                               defaultValue=""

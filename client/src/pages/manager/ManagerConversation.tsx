@@ -260,32 +260,56 @@ export default function ManagerConversation() {
               : 'שיחה קצרה על הצוות שלך — מה קורה, מה צריך תשומת לב, ואיך לשבץ חכם יותר.'}
           </p>
 
-          {teams.length === 0 ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
-              <AlertCircle className="w-5 h-5 mx-auto mb-2 text-amber-500" />
-              <p className="font-medium mb-1">אין צוותים מוגדרים</p>
-              <p className="text-amber-600">
-                כדי להתחיל שיחה, צור קודם צוות בדף{' '}
-                <button onClick={() => navigate('/manager/employees')} className="underline font-medium hover:text-amber-800">ניהול עובדים</button>
-                {' '}והוסף אליו עובדים.
-              </p>
-            </div>
-          ) : (
-            <button
-              onClick={startConversation}
-              disabled={loading || !selectedTeam}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  מתחיל...
-                </span>
-              ) : (
-                'התחל שיחה'
-              )}
-            </button>
-          )}
+          {(() => {
+            const selectedTeamData = teams.find(t => t.id === selectedTeam);
+            const hasTeams = teams.length > 0;
+            const hasEmployees = selectedTeamData?.employees?.length > 0;
+
+            if (!hasTeams) {
+              return (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                  <AlertCircle className="w-5 h-5 mx-auto mb-2 text-amber-500" />
+                  <p className="font-medium mb-1">לא ניתן להתחיל שיחה</p>
+                  <p className="text-amber-600">
+                    אין צוותים מוגדרים. עבור ל
+                    <button onClick={() => navigate('/manager/employees')} className="underline font-medium hover:text-amber-800 mx-1">ניהול עובדים</button>
+                    כדי ליצור צוות ולהוסיף אליו עובדים.
+                  </p>
+                </div>
+              );
+            }
+
+            if (!hasEmployees) {
+              return (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                  <AlertCircle className="w-5 h-5 mx-auto mb-2 text-amber-500" />
+                  <p className="font-medium mb-1">לא ניתן להתחיל שיחה</p>
+                  <p className="text-amber-600">
+                    הצוות ריק. עבור ל
+                    <button onClick={() => navigate('/manager/employees')} className="underline font-medium hover:text-amber-800 mx-1">ניהול עובדים</button>
+                    כדי להוסיף עובדים לצוות, ואז נוכל להתחיל לשוחח.
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <button
+                onClick={startConversation}
+                disabled={loading || !selectedTeam}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    מתחיל...
+                  </span>
+                ) : (
+                  'התחל שיחה'
+                )}
+              </button>
+            );
+          })()}
         </div>
 
         {/* Toast */}

@@ -303,6 +303,51 @@ router.put('/:id/details', authenticate, authorize('manager'), async (req: AuthR
   }
 });
 
+// DELETE /manage/employees/:id — delete employee
+router.delete('/:id', authenticate, authorize('manager', 'director'), async (req: AuthRequest, res: Response) => {
+  const prisma = getPrisma(req);
+  const { id } = req.params as Record<string, string>;
+
+  try {
+    const employee = await prisma.employee.findUnique({ where: { id } });
+    if (!employee) {
+      res.status(404).json({ error: 'עובד לא נמצא' });
+      return;
+    }
+
+    // Managers can only delete employees/team_leads, not other managers/directors
+    const isDirector = req.user!.effectiveRoles.includes('director');
+    if (!isDirector && employee.role !== 'employee' && employee.role !== 'team_lead') {
+      res.status(403).json({ error: 'אין הרשאה למחוק בעל תפקיד זה' });
+      return;
+    }
+
+    // Prevent deleting yourself
+    if (employee.id === req.user!.id) {
+      res.status(400).json({ error: 'לא ניתן למחוק את עצמך' });
+      return;
+    }
+
+    // Delete related data first
+    await prisma.constraint.deleteMany({ where: { employeeId: id } });
+    await prisma.employeeTag.deleteMany({ where: { employeeId: id } });
+    await prisma.lifeEvent.deleteMany({ where: { employeeId: id } });
+    await prisma.rating.deleteMany({ where: { employeeId: id } });
+    await prisma.shiftAssignment.deleteMany({ where: { employeeId: id } });
+    await prisma.swapRequest.deleteMany({ where: { OR: [{ requesterId: id }, { covererId: id }] } });
+
+    // If employee is a team lead, clear the team's leadId reference
+    await prisma.team.updateMany({ where: { leadId: id }, data: { leadId: req.user!.id } });
+
+    await prisma.employee.delete({ where: { id } });
+
+    res.json({ message: 'העובד נמחק בהצלחה' });
+  } catch (error) {
+    console.error('Delete employee error:', error);
+    res.status(500).json({ error: 'שגיאה במחיקת עובד' });
+  }
+});
+
 // PUT /manage/employees/:id/assign — assign employee to team
 router.put('/:id/assign', authenticate, authorize('manager'), async (req: AuthRequest, res: Response) => {
   const prisma = getPrisma(req);
