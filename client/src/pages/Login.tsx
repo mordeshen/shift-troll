@@ -84,33 +84,10 @@ export default function Login() {
           </Link>
         </div>
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-xs text-gray-400 text-center">סיסמה לכולם: 123456</p>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <QuickLogin email="director@example.com" label="מנהל מנהלים" setEmail={setEmail} setPassword={setPassword} />
-            <QuickLogin email="manager1@example.com" label="מנהל" setEmail={setEmail} setPassword={setPassword} />
-            <QuickLogin email="lead1@example.com" label="ראש צוות" setEmail={setEmail} setPassword={setPassword} />
-            <QuickLogin email="dana@example.com" label="עובד" setEmail={setEmail} setPassword={setPassword} />
-          </div>
+        <div className="mt-3 text-center">
+          <p className="text-xs text-gray-400">שכחת סיסמה? פנה למנהל שלך לאיפוס</p>
         </div>
       </div>
     </div>
-  );
-}
-
-function QuickLogin({ email, label, setEmail, setPassword }: {
-  email: string;
-  label: string;
-  setEmail: (v: string) => void;
-  setPassword: (v: string) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => { setEmail(email); setPassword('123456'); }}
-      className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors text-center"
-    >
-      {label}
-    </button>
   );
 }

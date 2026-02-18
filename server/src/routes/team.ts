@@ -267,4 +267,127 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /team/create — manager creates a new team
+router.post('/create', authenticate, authorize('manager', 'director'), async (req: AuthRequest, res: Response) => {
+  const prisma = getPrisma(req);
+  const { name, leadId } = req.body;
+
+  if (!name || !name.trim()) {
+    res.status(400).json({ error: 'נדרש שם צוות' });
+    return;
+  }
+
+  try {
+    // If leadId provided, verify the employee exists
+    if (leadId) {
+      const lead = await prisma.employee.findUnique({ where: { id: leadId } });
+      if (!lead) {
+        res.status(400).json({ error: 'ראש צוות לא נמצא' });
+        return;
+      }
+    }
+
+    const team = await prisma.team.create({
+      data: {
+        name: name.trim(),
+        managerId: req.user!.id,
+        leadId: leadId || req.user!.id, // default lead to the manager themselves
+      },
+      include: {
+        employees: { select: { id: true, name: true } },
+        lead: { select: { id: true, name: true } },
+      },
+    });
+
+    // If leadId was provided, update that employee's role to team_lead
+    if (leadId && leadId !== req.user!.id) {
+      await prisma.employee.update({
+        where: { id: leadId },
+        data: { role: 'team_lead', teamId: team.id },
+      });
+    }
+
+    res.status(201).json(team);
+  } catch (error) {
+    console.error('Create team error:', error);
+    res.status(500).json({ error: 'שגיאה ביצירת צוות' });
+  }
+});
+
+// PUT /team/:id — rename team
+router.put('/:id', authenticate, authorize('manager', 'director'), async (req: AuthRequest, res: Response) => {
+  const prisma = getPrisma(req);
+  const { id } = req.params as Record<string, string>;
+  const { name, leadId } = req.body;
+
+  try {
+    // Verify team belongs to this manager (unless director)
+    const team = await prisma.team.findUnique({ where: { id } });
+    if (!team) {
+      res.status(404).json({ error: 'צוות לא נמצא' });
+      return;
+    }
+
+    if (!req.user!.effectiveRoles.includes('director') && team.managerId !== req.user!.id) {
+      res.status(403).json({ error: 'אין הרשאה לצוות זה' });
+      return;
+    }
+
+    const updateData: Record<string, any> = {};
+    if (name && name.trim()) updateData.name = name.trim();
+    if (leadId) updateData.leadId = leadId;
+
+    const updated = await prisma.team.update({
+      where: { id },
+      data: updateData,
+      include: {
+        employees: { select: { id: true, name: true } },
+        lead: { select: { id: true, name: true } },
+      },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Update team error:', error);
+    res.status(500).json({ error: 'שגיאה בעדכון צוות' });
+  }
+});
+
+// DELETE /team/:id — delete empty team
+router.delete('/:id', authenticate, authorize('manager', 'director'), async (req: AuthRequest, res: Response) => {
+  const prisma = getPrisma(req);
+  const { id } = req.params as Record<string, string>;
+
+  try {
+    const team = await prisma.team.findUnique({
+      where: { id },
+      include: { employees: { select: { id: true } } },
+    });
+
+    if (!team) {
+      res.status(404).json({ error: 'צוות לא נמצא' });
+      return;
+    }
+
+    if (!req.user!.effectiveRoles.includes('director') && team.managerId !== req.user!.id) {
+      res.status(403).json({ error: 'אין הרשאה לצוות זה' });
+      return;
+    }
+
+    if (team.employees.length > 0) {
+      res.status(400).json({ error: 'לא ניתן למחוק צוות עם עובדים. העבר את העובדים לצוות אחר תחילה' });
+      return;
+    }
+
+    // Delete related shift templates first
+    await prisma.shiftTemplate.deleteMany({ where: { teamId: id } });
+    await prisma.team.delete({ where: { id } });
+
+    res.json({ message: 'הצוות נמחק' });
+  } catch (error) {
+    console.error('Delete team error:', error);
+    res.status(500).json({ error: 'שגיאה במחיקת צוות' });
+  }
+});
+
 export default router;

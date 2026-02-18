@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, Calendar, Users, BarChart3, MessageSquare, Settings, Menu, X } from 'lucide-react';
+import { LogOut, Calendar, Users, BarChart3, MessageSquare, Settings, Menu, X, Key, Check, AlertCircle } from 'lucide-react';
+import api from '../utils/api';
 
 const roleLabels: Record<string, string> = {
   employee: 'עובד',
@@ -55,10 +56,38 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [passwordToast, setPasswordToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleChangePassword = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordToast({ message: 'הסיסמאות אינן תואמות', type: 'error' });
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordToast({ message: 'סיסמה חדשה חייבת להכיל לפחות 6 תווים', type: 'error' });
+      return;
+    }
+    try {
+      await api.put('/auth/change-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setPasswordToast({ message: 'הסיסמה שונתה בהצלחה', type: 'success' });
+      setTimeout(() => {
+        setShowPasswordChange(false);
+        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        setPasswordToast(null);
+      }, 1500);
+    } catch (err: any) {
+      setPasswordToast({ message: err.response?.data?.error || 'שגיאה בשינוי סיסמה', type: 'error' });
+    }
   };
 
   const effectiveRoles = user?.effectiveRoles || [user?.role || ''];
@@ -121,6 +150,14 @@ export default function Layout() {
               {showCombinedLabel && <span className="text-blue-600 mr-1">(גישה מלאה)</span>}
             </span>
             <button
+              onClick={() => setShowPasswordChange(true)}
+              className="flex items-center gap-1 text-sm text-gray-500 hover:text-amber-600 transition-colors"
+              aria-label="שינוי סיסמה"
+              title="שינוי סיסמה"
+            >
+              <Key className="w-4 h-4" />
+            </button>
+            <button
               onClick={handleLogout}
               className="flex items-center gap-1 text-sm text-gray-500 hover:text-red-600 transition-colors"
               aria-label="יציאה"
@@ -153,6 +190,66 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Change Password Modal */}
+      {showPasswordChange && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => { setShowPasswordChange(false); setPasswordToast(null); }}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm" dir="rtl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <Key className="w-5 h-5 text-amber-600" />
+              שינוי סיסמה
+            </h3>
+
+            {passwordToast && (
+              <div className={`flex items-center gap-2 p-2.5 rounded-lg text-sm mb-3 ${
+                passwordToast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              }`}>
+                {passwordToast.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                {passwordToast.message}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <input
+                type="password"
+                placeholder="סיסמה נוכחית"
+                value={passwordForm.currentPassword}
+                onChange={e => setPasswordForm(f => ({ ...f, currentPassword: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+              />
+              <input
+                type="password"
+                placeholder="סיסמה חדשה (6+ תווים)"
+                value={passwordForm.newPassword}
+                onChange={e => setPasswordForm(f => ({ ...f, newPassword: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+              />
+              <input
+                type="password"
+                placeholder="אימות סיסמה חדשה"
+                value={passwordForm.confirmPassword}
+                onChange={e => setPasswordForm(f => ({ ...f, confirmPassword: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                onKeyDown={e => e.key === 'Enter' && handleChangePassword()}
+              />
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={handleChangePassword}
+                className="flex-1 bg-amber-600 text-white py-2 rounded-lg font-medium hover:bg-amber-700 transition-colors text-sm"
+              >
+                שנה סיסמה
+              </button>
+              <button
+                onClick={() => { setShowPasswordChange(false); setPasswordToast(null); }}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors"
+              >
+                ביטול
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

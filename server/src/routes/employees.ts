@@ -46,11 +46,24 @@ router.get('/', authenticate, authorize('director'), async (req: AuthRequest, re
   }
 });
 
-// PUT /manage/employees/:id/role — update role and/or combinedRole (director only)
-router.put('/:id/role', authenticate, authorize('director'), async (req: AuthRequest, res: Response) => {
+// PUT /manage/employees/:id/role — update role and/or combinedRole (director or manager)
+router.put('/:id/role', authenticate, authorize('director', 'manager'), async (req: AuthRequest, res: Response) => {
   const prisma = getPrisma(req);
   const { id } = req.params as Record<string, string>;
   const { role, combinedRole } = req.body;
+
+  // Managers can only promote employees to team_lead
+  const isDirector = req.user!.effectiveRoles.includes('director');
+  if (!isDirector) {
+    if (combinedRole !== undefined) {
+      res.status(403).json({ error: 'רק מנהל מנהלים יכול לשנות גישה מלאה' });
+      return;
+    }
+    if (role && role !== 'team_lead') {
+      res.status(403).json({ error: 'מנהל יכול רק לקדם עובד לראש צוות' });
+      return;
+    }
+  }
 
   // Validate inputs
   if (role !== undefined && !VALID_ROLES.includes(role)) {
@@ -105,6 +118,44 @@ router.put('/:id/role', authenticate, authorize('director'), async (req: AuthReq
   } catch (error) {
     console.error('Update role error:', error);
     res.status(500).json({ error: 'שגיאה בעדכון תפקיד' });
+  }
+});
+
+// PUT /manage/employees/:id/reset-password — manager resets employee password
+router.put('/:id/reset-password', authenticate, authorize('manager', 'director'), async (req: AuthRequest, res: Response) => {
+  const prisma = getPrisma(req);
+  const { id } = req.params as Record<string, string>;
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 6) {
+    res.status(400).json({ error: 'סיסמה חייבת להכיל לפחות 6 תווים' });
+    return;
+  }
+
+  try {
+    const employee = await prisma.employee.findUnique({ where: { id } });
+    if (!employee) {
+      res.status(404).json({ error: 'עובד לא נמצא' });
+      return;
+    }
+
+    // Managers can only reset passwords for employees (not other managers/directors)
+    const isDirector = req.user!.effectiveRoles.includes('director');
+    if (!isDirector && employee.role !== 'employee' && employee.role !== 'team_lead') {
+      res.status(403).json({ error: 'אין הרשאה לאפס סיסמה של בעל תפקיד זה' });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.employee.update({
+      where: { id },
+      data: { password: hashedPassword },
+    });
+
+    res.json({ message: 'הסיסמה אופסה בהצלחה' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'שגיאה באיפוס סיסמה' });
   }
 });
 

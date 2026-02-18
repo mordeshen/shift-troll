@@ -118,6 +118,47 @@ router.post('/register', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /auth/change-password — self-service password change
+router.put('/change-password', authenticate, async (req: AuthRequest, res: Response) => {
+  const prisma = getPrisma(req);
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: 'נדרשים סיסמה נוכחית וסיסמה חדשה' });
+    return;
+  }
+
+  if (newPassword.length < 6) {
+    res.status(400).json({ error: 'סיסמה חדשה חייבת להכיל לפחות 6 תווים' });
+    return;
+  }
+
+  try {
+    const employee = await prisma.employee.findUnique({ where: { id: req.user!.id } });
+    if (!employee) {
+      res.status(404).json({ error: 'משתמש לא נמצא' });
+      return;
+    }
+
+    const validPassword = await bcrypt.compare(currentPassword, employee.password);
+    if (!validPassword) {
+      res.status(401).json({ error: 'סיסמה נוכחית שגויה' });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.employee.update({
+      where: { id: req.user!.id },
+      data: { password: hashedPassword },
+    });
+
+    res.json({ message: 'הסיסמה שונתה בהצלחה' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'שגיאה בשינוי סיסמה' });
+  }
+});
+
 router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   const prisma = getPrisma(req);
   try {

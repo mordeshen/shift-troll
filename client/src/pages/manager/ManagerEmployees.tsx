@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Search, Check, AlertCircle, Plus, Pencil, Save, X, Copy, Users, UserPlus, Loader2 } from 'lucide-react';
+import { Search, Check, AlertCircle, Plus, Pencil, Save, X, Copy, Users, UserPlus, Loader2, Trash2, FolderPlus, Key, Shield } from 'lucide-react';
 
 interface Team {
   id: string;
   name: string;
+  lead?: { id: string; name: string };
+  employees?: { id: string; name: string }[];
 }
 
 interface Employee {
@@ -14,6 +16,7 @@ interface Employee {
   phone: string | null;
   birthYear: number | null;
   seniority: number;
+  role?: string;
   teamId: string | null;
   teamName: string | null;
 }
@@ -33,6 +36,17 @@ export default function ManagerEmployees() {
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Team management state
+  const [showTeamCreate, setShowTeamCreate] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [editTeamName, setEditTeamName] = useState('');
+  const [fullTeams, setFullTeams] = useState<Team[]>([]);
+
+  // Password reset state
+  const [resetPasswordId, setResetPasswordId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+
   useEffect(() => {
     loadData();
   }, []);
@@ -45,10 +59,14 @@ export default function ManagerEmployees() {
 
   const loadData = async () => {
     try {
-      const res = await api.get('/manage/employees/for-manager');
-      setTeams(res.data.teams);
-      setTeamEmployees(res.data.teamEmployees);
-      setUnassignedEmployees(res.data.unassignedEmployees);
+      const [empRes, teamRes] = await Promise.all([
+        api.get('/manage/employees/for-manager'),
+        api.get('/team'),
+      ]);
+      setTeams(empRes.data.teams);
+      setTeamEmployees(empRes.data.teamEmployees);
+      setUnassignedEmployees(empRes.data.unassignedEmployees);
+      setFullTeams(teamRes.data);
     } catch {
       setToast({ message: 'שגיאה בטעינת עובדים', type: 'error' });
     } finally {
@@ -116,6 +134,70 @@ export default function ManagerEmployees() {
     }
   };
 
+  // Team management handlers
+  const handleCreateTeam = async () => {
+    if (!newTeamName.trim()) return;
+    try {
+      await api.post('/team/create', { name: newTeamName.trim() });
+      setNewTeamName('');
+      setShowTeamCreate(false);
+      setToast({ message: 'צוות נוצר בהצלחה', type: 'success' });
+      loadData();
+    } catch (err: any) {
+      setToast({ message: err.response?.data?.error || 'שגיאה ביצירת צוות', type: 'error' });
+    }
+  };
+
+  const handleRenameTeam = async (id: string) => {
+    if (!editTeamName.trim()) return;
+    try {
+      await api.put(`/team/${id}`, { name: editTeamName.trim() });
+      setEditingTeamId(null);
+      setToast({ message: 'שם הצוות עודכן', type: 'success' });
+      loadData();
+    } catch (err: any) {
+      setToast({ message: err.response?.data?.error || 'שגיאה בעדכון צוות', type: 'error' });
+    }
+  };
+
+  const handleDeleteTeam = async (id: string) => {
+    if (!confirm('האם למחוק את הצוות?')) return;
+    try {
+      await api.delete(`/team/${id}`);
+      setToast({ message: 'הצוות נמחק', type: 'success' });
+      loadData();
+    } catch (err: any) {
+      setToast({ message: err.response?.data?.error || 'שגיאה במחיקת צוות', type: 'error' });
+    }
+  };
+
+  // Password reset handler
+  const handleResetPassword = async (id: string) => {
+    if (!newPassword || newPassword.length < 6) {
+      setToast({ message: 'סיסמה חייבת להכיל לפחות 6 תווים', type: 'error' });
+      return;
+    }
+    try {
+      await api.put(`/manage/employees/${id}/reset-password`, { newPassword });
+      setResetPasswordId(null);
+      setNewPassword('');
+      setToast({ message: 'הסיסמה אופסה בהצלחה', type: 'success' });
+    } catch (err: any) {
+      setToast({ message: err.response?.data?.error || 'שגיאה באיפוס סיסמה', type: 'error' });
+    }
+  };
+
+  // Promote to team_lead
+  const handlePromote = async (id: string) => {
+    try {
+      await api.put(`/manage/employees/${id}/role`, { role: 'team_lead' });
+      setToast({ message: 'העובד קודם לראש צוות', type: 'success' });
+      loadData();
+    } catch (err: any) {
+      setToast({ message: err.response?.data?.error || 'שגיאה בשינוי תפקיד', type: 'error' });
+    }
+  };
+
   const copyLink = () => {
     const url = `${window.location.origin}/register`;
     navigator.clipboard.writeText(url);
@@ -166,6 +248,91 @@ export default function ManagerEmployees() {
             <Plus className="w-4 h-4" />
             הוסף עובד
           </button>
+        </div>
+      </div>
+
+      {/* Team Management */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            ניהול צוותים
+          </h3>
+          <button
+            onClick={() => setShowTeamCreate(!showTeamCreate)}
+            className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors"
+          >
+            <FolderPlus className="w-3.5 h-3.5" />
+            צוות חדש
+          </button>
+        </div>
+
+        {showTeamCreate && (
+          <div className="flex items-center gap-2 mb-3 p-2 bg-blue-50 rounded-lg">
+            <input
+              type="text"
+              placeholder="שם הצוות החדש"
+              value={newTeamName}
+              onChange={e => setNewTeamName(e.target.value)}
+              className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+              onKeyDown={e => e.key === 'Enter' && handleCreateTeam()}
+            />
+            <button onClick={handleCreateTeam} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg">
+              <Check className="w-4 h-4" />
+            </button>
+            <button onClick={() => { setShowTeamCreate(false); setNewTeamName(''); }} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          {fullTeams.map(t => (
+            <div key={t.id} className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm">
+              {editingTeamId === t.id ? (
+                <>
+                  <input
+                    type="text"
+                    value={editTeamName}
+                    onChange={e => setEditTeamName(e.target.value)}
+                    className="w-24 px-2 py-0.5 border border-gray-300 rounded text-sm"
+                    onKeyDown={e => e.key === 'Enter' && handleRenameTeam(t.id)}
+                    autoFocus
+                  />
+                  <button onClick={() => handleRenameTeam(t.id)} className="p-0.5 text-green-600 hover:bg-green-50 rounded">
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => setEditingTeamId(null)} className="p-0.5 text-gray-400 hover:bg-gray-100 rounded">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="font-medium">{t.name}</span>
+                  <span className="text-gray-400 text-xs">({t.employees?.length || 0})</span>
+                  <button
+                    onClick={() => { setEditingTeamId(t.id); setEditTeamName(t.name); }}
+                    className="p-0.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                    title="שנה שם"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                  {(!t.employees || t.employees.length === 0) && (
+                    <button
+                      onClick={() => handleDeleteTeam(t.id)}
+                      className="p-0.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                      title="מחק צוות"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+          {fullTeams.length === 0 && (
+            <p className="text-xs text-gray-400">אין צוותים עדיין. צור צוות חדש כדי להתחיל.</p>
+          )}
         </div>
       </div>
 
@@ -281,6 +448,14 @@ export default function ManagerEmployees() {
                           <button onClick={() => startEdit(emp)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="עריכה">
                             <Pencil className="w-4 h-4" />
                           </button>
+                          <button onClick={() => { setResetPasswordId(emp.id); setNewPassword(''); }} className="p-1 text-amber-600 hover:bg-amber-50 rounded" title="איפוס סיסמה">
+                            <Key className="w-4 h-4" />
+                          </button>
+                          {emp.role === 'employee' && (
+                            <button onClick={() => handlePromote(emp.id)} className="p-1 text-purple-600 hover:bg-purple-50 rounded" title="קדם לראש צוות">
+                              <Shield className="w-4 h-4" />
+                            </button>
+                          )}
                           {tab === 'unassigned' && teams.length > 0 && (
                             <select
                               defaultValue=""
@@ -308,6 +483,44 @@ export default function ManagerEmployees() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Password Reset Modal */}
+      {resetPasswordId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setResetPasswordId(null)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm" dir="rtl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <Key className="w-5 h-5 text-amber-600" />
+              איפוס סיסמה
+            </h3>
+            <p className="text-sm text-gray-500 mb-3">
+              הזן סיסמה חדשה עבור: <strong>{[...teamEmployees, ...unassignedEmployees].find(e => e.id === resetPasswordId)?.name}</strong>
+            </p>
+            <input
+              type="password"
+              placeholder="סיסמה חדשה (6+ תווים)"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              minLength={6}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+              onKeyDown={e => e.key === 'Enter' && handleResetPassword(resetPasswordId)}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleResetPassword(resetPasswordId)}
+                className="flex-1 bg-amber-600 text-white py-2 rounded-lg font-medium hover:bg-amber-700 transition-colors text-sm"
+              >
+                אפס סיסמה
+              </button>
+              <button
+                onClick={() => setResetPasswordId(null)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors"
+              >
+                ביטול
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
